@@ -7,6 +7,8 @@ var ms = require('ms');
 var moment = require('moment');
 var utils = require('lockit-utils');
 var pwd = require('couch-pwd');
+//Frank
+var jwt = require('jsonwebtoken');
 
 /**
  * Internal helper functions
@@ -247,7 +249,8 @@ Login.prototype.postLogin = function(req, res, next) {
       user.currentLoginIp = req.ip;
 
       // set failed login attempts to zero but save them in the session
-      req.session.failedLoginAttempts = user.failedLoginAttempts;
+      //Frank
+      //req.session.failedLoginAttempts = user.failedLoginAttempts;
       user.failedLoginAttempts = 0;
       user.accountLocked = false;
 
@@ -256,8 +259,9 @@ Login.prototype.postLogin = function(req, res, next) {
         if (err) return next(err);
 
         // create session and save the name and email address
-        req.session.name = user.name;
-        req.session.email = user.email;
+        //Frank
+        //req.session.name = user.name;
+        //req.session.email = user.email;
 
         // check if two-factor authentication is enabled
         if (!user.twoFactorEnabled) {
@@ -266,7 +270,8 @@ Login.prototype.postLogin = function(req, res, next) {
           var target = req.query.redirect || '/';
 
           // user is now logged in
-          req.session.loggedIn = true;
+          //Frank
+          //req.session.loggedIn = true;
 
           // emit 'login' event
           that.emit('login', user, res, target);
@@ -274,7 +279,10 @@ Login.prototype.postLogin = function(req, res, next) {
           // let lockit handle the response
           if (config.login.handleResponse) {
             // send only JSON when REST is active
-            if (config.rest) return res.send(204);
+            //Frank
+            //if (config.rest) return res.send(204);
+            var token = jwt.sign({id: user._id}, 'secret.secretToken',{expiresInMinutes: 60});
+            if (config.rest) return res.status(200).json({token:token});
 
             // redirect to target url
             res.redirect(target);
