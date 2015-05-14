@@ -7,6 +7,7 @@ var ms = require('ms');
 var moment = require('moment');
 var utils = require('lockit-utils');
 var pwd = require('couch-pwd');
+
 //Frank
 var jwt = require('jsonwebtoken');
 
@@ -107,7 +108,7 @@ Login.prototype.postLogin = function(req, res, next) {
   var config = this.config;
   var that = this;
 
-  var error = '';
+  var error = {};
 
   var login = req.body.login;
   var password = req.body.password;
@@ -120,7 +121,7 @@ Login.prototype.postLogin = function(req, res, next) {
 
   // check for valid inputs
   if (!login || !password) {
-    error = 'Please enter your email/username and password';
+    error.code = 'login.01';
 
     // send only JSON when REST is active
     if (config.rest) return res.json(403, {error: error});
@@ -149,7 +150,7 @@ Login.prototype.postLogin = function(req, res, next) {
 
     // no user or user email isn't verified yet -> render error message
     if (!user || !user.emailVerified) {
-      error = 'Invalid user or password';
+      error.code = 'login.02';
 
       // send only JSON when REST is active
       if (config.rest) return res.json(403, {error: error});
@@ -168,7 +169,7 @@ Login.prototype.postLogin = function(req, res, next) {
 
     // check for too many failed login attempts
     if (user.accountLocked && new Date(user.accountLockedUntil) > new Date()) {
-      error = 'The account is temporarily locked';
+      error.code = 'login.03';
 
       // send only JSON when REST is active
       if (config.rest) return res.json(403, {error: error});
@@ -194,7 +195,7 @@ Login.prototype.postLogin = function(req, res, next) {
 
       if (hash !== user.derived_key) {
         // set the default error message
-        var errorMessage = 'Invalid user or password';
+        error.code = 'login.04';
 
         // increase failed login attempts
         user.failedLoginAttempts += 1;
@@ -207,10 +208,10 @@ Login.prototype.postLogin = function(req, res, next) {
           var timespan = ms(config.accountLockedTime);
           user.accountLockedUntil = moment().add(timespan, 'ms').toDate();
 
-          errorMessage = 'Invalid user or password. Your account is now locked for ' + config.accountLockedTime;
+          error = {code:'login.05',variable:{variable0:config.accountLockedTime}};
         } else if (user.failedLoginAttempts >= config.failedLoginsWarning) {
           // show a warning after 3 (default setting) failed login attempts
-          errorMessage = 'Invalid user or password. Your account will be locked soon.';
+          error.code = 'login.06';
         }
 
         // save user to db
@@ -218,14 +219,14 @@ Login.prototype.postLogin = function(req, res, next) {
           if (err) return next(err);
 
           // send only JSON when REST is active
-          if (config.rest) return res.json(403, {error: errorMessage});
+          if (config.rest) return res.json(403, {error: error});
 
           // send error message
           res.status(403);
           res.render(view, {
             title: 'Login',
             action: that.loginRoute + suffix,
-            error: errorMessage,
+            error: error,
             login: login,
             basedir: req.app.get('views')
           });
@@ -281,8 +282,12 @@ Login.prototype.postLogin = function(req, res, next) {
             // send only JSON when REST is active
             //Frank
             //if (config.rest) return res.send(204);
-            var token = jwt.sign({id: user._id}, 'secret.secretToken',{expiresInMinutes: 60});
+            //var userInfo = {type:user.type,email:user.email,name:user.name};
+            var signObejct = {id: user._id};
+            if(user.type == 'teacher') signObejct.subId = user.profile?user.profile.subject.subId:0;
+            var token = jwt.sign(signObejct, 'secret.Passw0rd!',{expiresInMinutes: 14*24*60});
             if (config.rest) return res.status(200).json({token:token});
+            //{token:token,user:{type:user.type,name:user.name,email:user.email,code:user.code}}
 
             // redirect to target url
             res.redirect(target);
